@@ -1,0 +1,12 @@
+services:
+  tuke-folk:
+    build: .
+    container_name: tuke_folk_app
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
+    volumes:
+      # データベースファイルをホスト側（Ubuntu Server）の ./data ディレクトリに永続化
+      - ./data:/app/data
+    environment:
+      - TZ=Asia/Tokyo

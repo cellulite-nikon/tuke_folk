@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>PDFデザインエディタ - ツケ管理</title>
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --bg-panel: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --green: #10b981;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Meiryo", sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* 上部ヘッダー */
+    header {
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+      z-index: 20;
+    }
+    .header-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .header-actions {
+      display: flex;
+      gap: 8px;
+    }
+    button, .btn {
+      padding: 7px 14px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+      transition: all 0.15s;
+    }
+    .btn-back { background: #334155; color: var(--text); }
+    .btn-save { background: #0284c7; color: white; }
+    .btn-save:hover { background: #0369a1; }
+    .btn-reset { background: transparent; border: 1px solid #ef444466; color: #f87171; }
+    .btn-print { background: var(--green); color: white; }
+
+    /* モバイル用表示切り替えタブ */
+    .mobile-view-tabs {
+      display: none;
+      background: #0b1120;
+      border-bottom: 1px solid var(--border);
+      padding: 6px 12px;
+      gap: 8px;
+    }
+    .m-tab-btn {
+      flex: 1;
+      padding: 8px;
+      font-size: 0.85rem;
+      background: transparent;
+      color: var(--text-muted);
+      border-radius: 6px;
+      border: 1px solid transparent;
+    }
+    .m-tab-btn.active {
+      background: var(--bg-panel);
+      color: var(--accent);
+      border-color: var(--border);
+      font-weight: bold;
+    }
+
+    /* メインワークスペース（スプリット） */
+    .workspace {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* エディタペイン（左側） */
+    .editor-pane {
+      width: 50%;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      background: #111827;
+    }
+    .editor-tabs {
+      background: var(--bg-panel);
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab-btn {
+      padding: 10px 16px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      background: transparent;
+      border-radius: 0;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+    }
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      background: rgba(56, 189, 248, 0.05);
+      font-weight: 700;
+    }
+
+    /* 変数パレット */
+    .var-palette {
+      background: #0f172a;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      white-space: nowrap;
+      align-items: center;
+    }
+    .var-palette-title {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-right: 4px;
+    }
+    .var-chip {
+      background: #1e293b;
+      color: #38bdf8;
+      border: 1px solid #334155;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-family: monospace;
+      cursor: pointer;
+    }
+    .var-chip:hover {
+      background: #334155;
+      border-color: #38bdf8;
+    }
+
+    /* コードテキストエリア */
+    .code-container {
+      flex: 1;
+      position: relative;
+    }
+    textarea.code-editor {
+      width: 100%;
+      height: 100%;
+      background: #090d16;
+      color: #e2e8f0;
+      border: none;
+      padding: 16px;
+      font-family: "Fira Code", Menlo, Monaco, Consolas, "Courier New", monospace;
+      font-size: 0.88rem;
+      line-height: 1.6;
+      resize: none;
+      outline: none;
+      tab-size: 2;
+    }
+
+    /* プレビューペイン（右側） */
+    .preview-pane {
+      width: 50%;
+      background: #475569;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .preview-header {
+      background: #334155;
+      padding: 8px 16px;
+      font-size: 0.8rem;
+      color: #cbd5e1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .preview-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 16px;
+      display: flex;
+      justify-content: center;
+    }
+
+    /* プレビュー用仮想ペーパー */
+    .preview-paper-wrapper {
+      width: 100%;
+      max-width: 750px;
+      min-height: 900px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    /* レスポンシブ対応 (スマホ) */
+    @media (max-width: 768px) {
+      .mobile-view-tabs { display: flex; }
+      .workspace { flex-direction: column; }
+      .editor-pane { width: 100%; height: 100%; }
+      .preview-pane { width: 100%; height: 100%; display: none; }
+      .preview-body { padding: 12px 8px; }
+      .header-title span { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ヘッダー -->
+  <header>
+    <div class="header-title">
+      <a href="/" class="btn btn-back">← 戻る</a>
+      <span>🎨 PDFデザインエディタ</span>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-reset" onclick="resetToDefault()">🔄 初期化</button>
+      <button class="btn btn-save" onclick="saveTemplate()">💾 保存する</button>
+      <button class="btn btn-print" onclick="openPrintView()">🖨️ PDFプレビュー</button>
+    </div>
+  </header>
+
+  <!-- モバイル用切替タブ -->
+  <div class="mobile-view-tabs">
+    <button class="m-tab-btn active" id="m-btn-edit" onclick="setMobileView('edit')">✏️ デザイン編集</button>
+    <button class="m-tab-btn" id="m-btn-prev" onclick="setMobileView('prev')">👁️ プレビュー確認</button>
+  </div>
+
+  <!-- メインワークスペース -->
+  <div class="workspace">
+    <!-- 左: エディタ -->
+    <div class="editor-pane" id="pane-editor">
+      <!-- エディタタブ -->
+      <div class="editor-tabs">
+        <button class="tab-btn active" id="tab-btn-html" onclick="switchEditorTab('html')">📄 HTMLテンプレート</button>
+        <button class="tab-btn" id="tab-btn-css" onclick="switchEditorTab('css')">🎨 スタイル (CSS)</button>
+        <button class="tab-btn" id="tab-btn-notice" onclick="switchEditorTab('notice')">💬 案内メッセージ</button>
+      </div>
+
+      <!-- 変数パレット（クリックで挿入） -->
+      <div class="var-palette" id="var-palette-bar">
+        <span class="var-palette-title">変数挿入:</span>
+        <span class="var-chip" onclick="insertVar('{{group_name}}')">グループ名</span>
+        <span class="var-chip" onclick="insertVar('{{total_debt}}')">立替総額</span>
+        <span class="var-chip" onclick="insertVar('{{generated_at}}')">発行日時</span>
+        <span class="var-chip" onclick="insertVar('{{member_name}}')">メンバー名</span>
+        <span class="var-chip" onclick="insertVar('{{member_total_debt}}')">個人ツケ合計</span>
+        <span class="var-chip" onclick="insertVar('{{event_title}}')">飲み会名</span>
+        <span class="var-chip" onclick="insertVar('{{event_date}}')">開催日</span>
+        <span class="var-chip" onclick="insertVar('{{debt_amount}}')">ツケ額</span>
+        <span class="var-chip" onclick="insertVar('{{notice}}')">案内メモ</span>
+      </div>
+
+      <!-- コードエディタ領域 -->
+      <div class="code-container">
+        <textarea class="code-editor" id="editor-html" spellcheck="false" placeholder="HTMLテンプレートを入力"></textarea>
+        <textarea class="code-editor" id="editor-css" spellcheck="false" style="display:none;" placeholder="CSSスタイルを入力"></textarea>
+        <div id="editor-notice-container" style="display:none; padding:16px; height:100%; background:#090d16;">
+          <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;">
+            PDF下部に表示される案内文（PayPayの受取リンクや振込先、精算期限など）：
+          </div>
+          <textarea class="code-editor" id="editor-notice" style="height:200px; border-radius:8px; border:1px solid var(--border);" placeholder="例: PayPay ID: xxx または 幹事のLINEまで送金をお願いします！"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右: リアルタイムプレビュー -->
+    <div class="preview-pane" id="pane-preview">
+      <div class="preview-header">
+        <span>リアルタイムA4プレビュー (編集内容が即座に反映されます)</span>
+        <span id="preview-data-status" style="color:#38bdf8;">実データを反映中</span>
+      </div>
+      <div class="preview-body">
+        <div class="preview-paper-wrapper">
+          <!-- プレビュー用のスタイルを動的に注入 -->
+          <style id="preview-injected-style"></style>
+          <!-- プレビュー用HTML -->
+          <div id="preview-injected-html"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentGroupId = 1;
+    let currentReportData = null;
+    let activeEditorTab = 'html';
+
+    // サンプルデータ（実データが空の場合のフォールバック）
+    const sampleData = {
+      group: { id: 1, name: "サンプルサークル飲み会" },
+      generated_at: "2026年11月11日 19:00",
+      total_debt: 12000,
+      template: { notice_text: "上記をご確認いただき、PayPayまたは次回集合時にお支払い・精算をお願いいたします。<br>精算完了次第、アプリ上で消込を行います。" },
+      members: [
+        {
+          id: 1,
+          name: "佐藤",
+          total_debt: 8000,
+          debts: [
+            { event_title: "渋谷 焼き鳥 金曜会", event_date: "2026-11-06", target_amount: 5000, paid_amount: 0, debt_amount: 5000 },
+            { event_title: "2次会 カラオケパセラ", event_date: "2026-11-06", target_amount: 3000, paid_amount: 0, debt_amount: 3000 }
+          ]
+        },
+        {
+          id: 2,
+          name: "鈴木",
+          total_debt: 4000,
+          debts: [
+            { event_title: "渋谷 焼き鳥 金曜会", event_date: "2026-11-06", target_amount: 5000, paid_amount: 1000, debt_amount: 4000 }
+          ]
+        }
+      ]
+    };
+
+    function formatYen(num) {
+      return '¥' + Number(num || 0).toLocaleString();
+    }
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[m]);
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      currentGroupId = Number(urlParams.get('group_id') || localStorage.getItem('tuke_active_group_id') || 1);
+
+      // 実データを取得
+      try {
+        const res = await fetch(`/api/groups/${currentGroupId}/report`);
+        if (res.ok) {
+          const data = await res.json();
+          // 実データにツケメンバーがいる場合は実データを使用、いなければサンプルデータを使ってプレビュー
+          if (data.members && data.members.length > 0) {
+            currentReportData = data;
+            document.getElementById('preview-data-status').textContent = `グループ「${data.group.name}」の実データを反映中`;
+          } else {
+            currentReportData = { ...sampleData, group: data.group, template: data.template };
+            document.getElementById('preview-data-status').textContent = `ツケ未発生のためサンプルデータを表示中`;
+          }
+        }
+      } catch (e) {
+        currentReportData = sampleData;
+      }
+
+      // テンプレートをロード
+      await loadTemplate();
+
+      // 入力監視（リアルタイムプレビュー更新）
+      document.getElementById('editor-html').addEventListener('input', updateLivePreview);
+      document.getElementById('editor-css').addEventListener('input', updateLivePreview);
+      document.getElementById('editor-notice').addEventListener('input', updateLivePreview);
+
+      updateLivePreview();
+    });
+
+    async function loadTemplate() {
+      try {
+        const res = await fetch('/api/template');
+        const tmpl = await res.json();
+        document.getElementById('editor-html').value = tmpl.html_content;
+        document.getElementById('editor-css').value = tmpl.css_content;
+        document.getElementById('editor-notice').value = tmpl.notice_text;
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function switchEditorTab(tab) {
+      activeEditorTab = tab;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('editor-html').style.display = 'none';
+      document.getElementById('editor-css').style.display = 'none';
+      document.getElementById('editor-notice-container').style.display = 'none';
+
+      if (tab === 'html') {
+        document.getElementById('tab-btn-html').classList.add('active');
+        document.getElementById('editor-html').style.display = 'block';
+        document.getElementById('var-palette-bar').style.display = 'flex';
+      } else if (tab === 'css') {
+        document.getElementById('tab-btn-css').classList.add('active');
+        document.getElementById('editor-css').style.display = 'block';
+        document.getElementById('var-palette-bar').style.display = 'none';
+      } else if (tab === 'notice') {
+        document.getElementById('tab-btn-notice').classList.add('active');
+        document.getElementById('editor-notice-container').style.display = 'block';
+        document.getElementById('var-palette-bar').style.display = 'none';
+      }
+    }
+
+    // 変数チップをクリックしてカーソル位置に挿入
+    function insertVar(val) {
+      const textarea = document.getElementById('editor-html');
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const text = textarea.value;
+      textarea.value = text.substring(0, start) + val + text.substring(end);
+      textarea.selectionStart = textarea.selectionEnd = start + val.length;
+      textarea.focus();
+      updateLivePreview();
+    }
+
+    // テンプレートレンダリング関数
+    function renderTemplate(htmlTmpl, data) {
+      if (!data) return htmlTmpl;
+
+      let res = htmlTmpl.replace(/{{#members}}([\s\S]*?){{\/members}}/g, (match, memberTmpl) => {
+        if (!data.members || data.members.length === 0) return '';
+        return data.members.map(m => {
+          let mHtml = memberTmpl
+            .replace(/{{member_name}}/g, escapeHtml(m.name))
+            .replace(/{{member_total_debt}}/g, formatYen(m.total_debt));
+          
+          mHtml = mHtml.replace(/{{#debts}}([\s\S]*?){{\/debts}}/g, (match2, debtTmpl) => {
+            if (!m.debts || m.debts.length === 0) return '';
+            return m.debts.map(d => {
+              return debtTmpl
+                .replace(/{{event_date}}/g, escapeHtml(d.event_date))
+                .replace(/{{event_title}}/g, escapeHtml(d.event_title))
+                .replace(/{{target_amount}}/g, formatYen(d.target_amount))
+                .replace(/{{paid_amount}}/g, formatYen(d.paid_amount))
+                .replace(/{{debt_amount}}/g, formatYen(d.debt_amount));
+            }).join('');
+          });
+
+          return mHtml;
+        }).join('');
+      });
+
+      const notice = document.getElementById('editor-notice').value;
+      res = res
+        .replace(/{{group_name}}/g, escapeHtml(data.group.name))
+        .replace(/{{generated_at}}/g, escapeHtml(data.generated_at))
+        .replace(/{{total_debt}}/g, formatYen(data.total_debt))
+        .replace(/{{notice}}/g, notice);
+
+      return res;
+    }
+
+    // リアルタイムプレビュー更新
+    function updateLivePreview() {
+      const htmlTmpl = document.getElementById('editor-html').value;
+      const cssTmpl = document.getElementById('editor-css').value;
+
+      document.getElementById('preview-injected-style').textContent = cssTmpl;
+      document.getElementById('preview-injected-html').innerHTML = renderTemplate(htmlTmpl, currentReportData);
+    }
+
+    // テンプレート保存
+    async function saveTemplate() {
+      const html_content = document.getElementById('editor-html').value;
+      const css_content = document.getElementById('editor-css').value;
+      const notice_text = document.getElementById('editor-notice').value;
+
+      try {
+        const res = await fetch('/api/template', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ html_content, css_content, notice_text })
+        });
+        if (res.ok) {
+          alert("🎉 デザインテンプレートを保存しました！\n今後のPDF出力にこのデザインが適用されます。");
+        } else {
+          alert("保存に失敗しました");
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // 初期状態にリセット
+    async function resetToDefault() {
+      if (!confirm("デザインテンプレートを初期状態に戻しますか？")) return;
+      try {
+        const res = await fetch('/api/template/reset', { method: 'POST' });
+        const data = await res.json();
+        document.getElementById('editor-html').value = data.html_content;
+        document.getElementById('editor-css').value = data.css_content;
+        document.getElementById('editor-notice').value = data.notice_text;
+        updateLivePreview();
+        alert("初期デザインに戻しました。");
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // 実際のPDF印刷ビューを開く
+    function openPrintView() {
+      window.open(`/report.html?group_id=${currentGroupId}`, '_blank');
+    }
+
+    // モバイル用表示切り替え
+    function setMobileView(view) {
+      const editBtn = document.getElementById('m-btn-edit');
+      const prevBtn = document.getElementById('m-btn-prev');
+      const editPane = document.getElementById('pane-editor');
+      const prevPane = document.getElementById('pane-preview');
+
+      if (view === 'edit') {
+        editBtn.classList.add('active');
+        prevBtn.classList.remove('active');
+        editPane.style.display = 'flex';
+        prevPane.style.display = 'none';
+      } else {
+        prevBtn.classList.add('active');
+        editBtn.classList.remove('active');
+        editPane.style.display = 'none';
+        prevPane.style.display = 'flex';
+        updateLivePreview();
+      }
+    }
+  </script>
+</body>
+</html>

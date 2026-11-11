@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>飲み会ツケ状況報告書</title>
+  <style>
+    /* 操作バーと印刷時制御の基本スタイル */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: #f1f5f9;
+      padding: 20px 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Meiryo", sans-serif;
+    }
+    .action-bar {
+      max-width: 800px;
+      margin: 0 auto 20px auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      padding: 10px 16px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      border-radius: 10px;
+      cursor: pointer;
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+    }
+    .btn-back { background: #e2e8f0; color: #334155; }
+    .btn-edit { background: #6366f1; color: white; }
+    .btn-print { background: #0284c7; color: white; box-shadow: 0 4px 10px rgba(2, 132, 199, 0.3); }
+    .btn-copy { background: #059669; color: white; }
+
+    @media print {
+      body { background: white !important; padding: 0 !important; }
+      .no-print { display: none !important; }
+    }
+  </style>
+
+  <!-- 動的に注入されるカスタムCSSスタイル -->
+  <style id="custom-report-style"></style>
+</head>
+<body>
+
+  <!-- 上部操作バー（印刷・PDF時は非表示） -->
+  <div class="action-bar no-print">
+    <a href="/" class="btn btn-back">← アプリに戻る</a>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <a href="/editor.html" class="btn btn-edit" id="btn-to-editor">🎨 デザイン編集</a>
+      <button class="btn btn-copy" onclick="copyShareText()">📋 LINE用テキスト</button>
+      <button class="btn btn-print" onclick="window.print()">🖨️ PDF保存 / 印刷</button>
+    </div>
+  </div>
+
+  <!-- 報告書本体（動的にカスタムテンプレートで描画） -->
+  <div id="report-root">
+    <div style="text-align:center; padding:50px; color:#64748b;">読み込み中...</div>
+  </div>
+
+  <script>
+    let reportData = null;
+
+    function formatYen(num) {
+      return '¥' + Number(num || 0).toLocaleString();
+    }
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[m]);
+    }
+
+    // テンプレートレンダリング関数
+    function renderCustomTemplate(htmlTmpl, data) {
+      if (!data) return htmlTmpl;
+
+      // 1. members ループ
+      let res = htmlTmpl.replace(/{{#members}}([\s\S]*?){{\/members}}/g, (match, memberTmpl) => {
+        if (!data.members || data.members.length === 0) {
+          return '<div style="text-align:center; padding:30px; color:#64748b;">未回収のツケはありません</div>';
+        }
+        return data.members.map(m => {
+          let mHtml = memberTmpl
+            .replace(/{{member_name}}/g, escapeHtml(m.name))
+            .replace(/{{member_total_debt}}/g, formatYen(m.total_debt));
+          
+          // debts ループ
+          mHtml = mHtml.replace(/{{#debts}}([\s\S]*?){{\/debts}}/g, (match2, debtTmpl) => {
+            if (!m.debts || m.debts.length === 0) return '';
+            return m.debts.map(d => {
+              return debtTmpl
+                .replace(/{{event_date}}/g, escapeHtml(d.event_date))
+                .replace(/{{event_title}}/g, escapeHtml(d.event_title))
+                .replace(/{{target_amount}}/g, formatYen(d.target_amount))
+                .replace(/{{paid_amount}}/g, formatYen(d.paid_amount))
+                .replace(/{{debt_amount}}/g, formatYen(d.debt_amount));
+            }).join('');
+          });
+
+          return mHtml;
+        }).join('');
+      });
+
+      // 2. 単一変数の置換
+      const notice = data.template ? data.template.notice_text : '';
+      res = res
+        .replace(/{{group_name}}/g, escapeHtml(data.group.name))
+        .replace(/{{generated_at}}/g, escapeHtml(data.generated_at))
+        .replace(/{{total_debt}}/g, formatYen(data.total_debt))
+        .replace(/{{notice}}/g, notice);
+
+      return res;
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const groupId = urlParams.get('group_id') || 1;
+      document.getElementById('btn-to-editor').href = `/editor.html?group_id=${groupId}`;
+
+      try {
+        const res = await fetch(`/api/groups/${groupId}/report`);
+        if (!res.ok) {
+          document.getElementById('report-root').innerHTML = '<p>データの取得に失敗しました</p>';
+          return;
+        }
+        reportData = await res.json();
+
+        // カスタムCSS注入
+        if (reportData.template && reportData.template.css_content) {
+          document.getElementById('custom-report-style').textContent = reportData.template.css_content;
+        }
+
+        // カスタムHTML描画
+        const htmlTmpl = (reportData.template && reportData.template.html_content) ? reportData.template.html_content : '';
+        document.getElementById('report-root').innerHTML = renderCustomTemplate(htmlTmpl, reportData);
+
+      } catch (err) {
+        console.error(err);
+      }
+    });
+
+    function copyShareText() {
+      if (!reportData || !reportData.members || reportData.members.length === 0) {
+        alert("未回収のツケはありません");
+        return;
+      }
+
+      let text = `【🍻 飲み会ツケ状況報告】\n`;
+      text += `グループ: ${reportData.group.name}\n`;
+      text += `立替額合計: ${formatYen(reportData.total_debt)}\n`;
+      text += `-------------------------\n`;
+
+      reportData.members.forEach(m => {
+        text += `\n👤 ${m.name}: 合計 ${formatYen(m.total_debt)}\n`;
+        m.debts.forEach(d => {
+          text += `  ・${d.event_date} ${d.event_title}: ${formatYen(d.debt_amount)}\n`;
+        });
+      });
+
+      text += `\n-------------------------\n`;
+      text += `ご確認の上、精算をお願いします！🙏`;
+
+      navigator.clipboard.writeText(text).then(() => {
+        alert("LINE共有用テキストをコピーしました！");
+      }).catch(err => {
+        prompt("以下のテキストをコピーしてください:", text);
+      });
+    }
+  </script>
+</body>
+</html>

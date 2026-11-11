@@ -1,0 +1,1790 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ツケ管理">
+  <link rel="manifest" href="/manifest.json">
+  <title>飲み会ツケ管理</title>
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-card: #1e293b;
+      --bg-card-hover: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --green: #22c55e;
+      --green-bg: #14532d;
+      --red: #ef4444;
+      --red-bg: #7f1d1d;
+      --yellow: #f59e0b;
+      --yellow-bg: #78350f;
+      --border: #334155;
+      --safe-bottom: env(safe-area-inset-bottom, 16px);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Meiryo", sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: calc(72px + var(--safe-bottom));
+      user-select: none;
+    }
+
+    header {
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .group-selector-btn {
+      background: #1e293b;
+      border: 1px solid #38bdf866;
+      color: var(--text-main);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      max-width: 220px;
+    }
+    .group-selector-btn:active { background: #334155; }
+    .group-name-truncate {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .group-chevron { font-size: 0.7rem; color: var(--accent); }
+
+    main {
+      flex: 1;
+      padding: 16px;
+      max-width: 600px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 16px;
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .summary-card {
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      border: 1px solid #38bdf844;
+      text-align: center;
+      padding: 20px 16px;
+    }
+    .summary-label {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .summary-amount {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: #f87171;
+      letter-spacing: -0.5px;
+    }
+    .summary-stats {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .stat-item { text-align: center; }
+    .stat-val {
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: var(--text-main);
+    }
+    .stat-lbl {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 12px;
+      font-weight: 600;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      touch-action: manipulation;
+    }
+    button:active { transform: scale(0.97); }
+    .btn-primary {
+      background: #0284c7;
+      color: white;
+      padding: 12px 20px;
+      width: 100%;
+      font-size: 0.95rem;
+    }
+    .btn-primary:active { background: #0369a1; }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 10px;
+      font-size: 0.75rem;
+    }
+    .btn-danger-outline {
+      background: transparent;
+      border: 1px solid #ef444466;
+      color: #f87171;
+      padding: 6px 10px;
+      font-size: 0.75rem;
+    }
+    .btn-danger-outline:active { background: var(--red-bg); }
+
+    .participant-card {
+      background: var(--bg-card);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 12px;
+      border: 1px solid var(--border);
+      transition: border-color 0.2s;
+    }
+    .participant-card.paid { border-left: 5px solid var(--green); }
+    .participant-card.unpaid { border-left: 5px solid var(--red); }
+    .participant-card.partial { border-left: 5px solid var(--yellow); }
+    .participant-card.settled { border-left: 5px solid #64748b; opacity: 0.8; }
+
+    .p-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .p-name {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+    .p-fee-info {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: bold;
+    }
+    .badge-paid { background: var(--green-bg); color: var(--green); }
+    .badge-unpaid { background: var(--red-bg); color: var(--red); }
+    .badge-partial { background: var(--yellow-bg); color: var(--yellow); }
+    .badge-settled { background: #334155; color: #94a3b8; }
+
+    .action-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .act-btn {
+      padding: 10px 4px;
+      font-size: 0.85rem;
+      border-radius: 10px;
+      text-align: center;
+      font-weight: 700;
+    }
+    .act-btn-paid {
+      background: var(--green-bg);
+      color: #4ade80;
+      border: 1px solid #22c55e66;
+    }
+    .act-btn-paid.active {
+      background: var(--green);
+      color: #064e3b;
+      box-shadow: 0 0 10px rgba(34, 197, 94, 0.4);
+    }
+    .act-btn-unpaid {
+      background: var(--red-bg);
+      color: #f87171;
+      border: 1px solid #ef444466;
+    }
+    .act-btn-unpaid.active {
+      background: var(--red);
+      color: white;
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+    }
+    .act-btn-partial {
+      background: var(--yellow-bg);
+      color: #fbbf24;
+      border: 1px solid #f59e0b66;
+    }
+    .act-btn-partial.active {
+      background: var(--yellow);
+      color: #451a03;
+      box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+    }
+
+    .p-debt-bar {
+      margin-top: 8px;
+      font-size: 0.8rem;
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-muted);
+      background: rgba(0,0,0,0.2);
+      padding: 6px 10px;
+      border-radius: 8px;
+    }
+
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-around;
+      padding: 8px 0 calc(8px + var(--safe-bottom));
+      z-index: 100;
+    }
+    .nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      border: none;
+      background: none;
+    }
+    .nav-item.active { color: var(--accent); font-weight: 700; }
+    .nav-icon { font-size: 1.3rem; }
+
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      z-index: 200;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .modal-backdrop.show { display: flex; }
+    .modal-content {
+      background: var(--bg-card);
+      border-top-left-radius: 20px;
+      border-top-right-radius: 20px;
+      width: 100%;
+      max-width: 600px;
+      padding: 24px 20px calc(24px + var(--safe-bottom));
+      border-top: 1px solid var(--border);
+      animation: slideUp 0.25s ease-out;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .modal-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .close-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+
+    .form-group { margin-bottom: 14px; }
+    .form-label {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .form-input {
+      width: 100%;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 12px 14px;
+      border-radius: 10px;
+      font-size: 1rem;
+      outline: none;
+    }
+    .form-input:focus { border-color: var(--accent); }
+    .quick-amount-buttons { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+    .quick-btn {
+      background: #334155;
+      color: var(--text-main);
+      padding: 8px 12px;
+      font-size: 0.8rem;
+      border-radius: 8px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 16px;
+      color: var(--text-muted);
+    }
+    .empty-icon { font-size: 2.5rem; margin-bottom: 12px; }
+
+    /* メンバー高密度リストスタイル */
+    .member-compact-list {
+      background: var(--bg-card);
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .member-compact-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 9px 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      gap: 8px;
+    }
+    .member-compact-row:last-child {
+      border-bottom: none;
+    }
+    .member-compact-row:active {
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .m-compact-name {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-main);
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .m-compact-badge {
+      flex-shrink: 0;
+    }
+    .m-compact-actions {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .icon-btn {
+      background: #334155;
+      border: none;
+      color: var(--text-muted);
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .icon-btn:active { background: #475569; }
+    .icon-btn-danger {
+      background: transparent;
+      border: 1px solid #ef444455;
+      color: #f87171;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .icon-btn-danger:active { background: var(--red-bg); }
+
+    .debt-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .debt-item:last-child { border-bottom: none; }
+
+    .group-item-card {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.2s;
+    }
+    .group-item-card.active { border-color: var(--accent); background: #082f49; }
+    .group-actions { display: flex; gap: 6px; align-items: center; }
+  </style>
+</head>
+<body>
+
+  <!-- ヘッダー -->
+  <header>
+    <button class="group-selector-btn" onclick="openGroupModal()">
+      <span>🍻</span>
+      <span class="group-name-truncate" id="current-group-name">読み込み中...</span>
+      <span class="group-chevron">▼</span>
+    </button>
+    <button class="btn-outline" onclick="openGroupModal()">
+      切替・編集
+    </button>
+  </header>
+
+  <!-- メインコンテンツ -->
+  <main id="app">
+    <!-- タブ1: 飲み会一覧 & 集金現場 -->
+    <section id="tab-events" class="tab-content">
+      <div id="events-view">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <h2 style="font-size:1.1rem; font-weight:700;">飲み会一覧</h2>
+          <button class="btn-primary" style="width:auto; padding:8px 14px;" onclick="openNewEventModal()">
+            ＋ 新規飲み会
+          </button>
+        </div>
+        <div id="events-list">読み込み中...</div>
+      </div>
+
+      <!-- 飲み会詳細・現場集金モード -->
+      <div id="event-detail-view" style="display:none;">
+        <button class="btn-outline" style="margin-bottom:12px;" onclick="backToEventsList()">
+          ← 飲み会一覧に戻る
+        </button>
+
+        <!-- 飲み会情報ヘッダーカード -->
+        <div class="card" id="event-header-card">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div style="flex:1;">
+              <h2 id="detail-title" style="font-size:1.25rem; font-weight:800; margin-bottom:4px;"></h2>
+              <div id="detail-date" style="font-size:0.85rem; color:var(--text-muted);"></div>
+            </div>
+            <div style="display:flex; gap:6px;">
+              <button class="btn-outline" onclick="openEditEventModal()">✏️ 編集</button>
+              <button class="btn-danger-outline" onclick="deleteCurrentEvent()">削除</button>
+            </div>
+          </div>
+
+          <div class="summary-stats" style="margin-top:12px; padding-top:10px;">
+            <div class="stat-item">
+              <div class="stat-val" id="stat-total-target">¥0</div>
+              <div class="stat-lbl">集金総額</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-val" style="color:var(--green);" id="stat-total-paid">¥0</div>
+              <div class="stat-lbl">回収済</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-val" style="color:var(--red);" id="stat-total-debt">¥0</div>
+              <div class="stat-lbl">ツケ（建て替え）</div>
+            </div>
+          </div>
+
+          <!-- 店舗支払額（実費）と余剰金表示バー -->
+          <div id="actual-cost-box" style="margin-top:12px; padding:10px 14px; background:rgba(0,0,0,0.25); border-radius:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div>
+              <span style="font-size:0.75rem; color:var(--text-muted); display:block;">店舗支払額（実費）</span>
+              <strong id="stat-actual-cost" style="font-size:1.05rem; color:var(--text-main);">未入力</strong>
+            </div>
+            <div id="stat-profit-container" style="display:none;">
+              <span style="font-size:0.75rem; color:var(--text-muted); display:block;">余剰金 ((回収済)-(店舗支払))</span>
+              <strong id="stat-profit-amount" style="font-size:1.05rem; color:#38bdf8;">¥0</strong>
+            </div>
+            <button class="btn-outline" style="padding:4px 10px; font-size:0.75rem;" onclick="promptSetActualCost()">
+              ✏️ 実費を入力
+            </button>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <span style="font-size:0.95rem; font-weight:700;">参加者 (<span id="participant-count">0</span>人)</span>
+          <button class="btn-primary" style="width:auto; padding:6px 12px; font-size:0.85rem;" onclick="openAddParticipantModal()">
+            ＋ 参加者を追加
+          </button>
+        </div>
+
+        <div id="participants-list"></div>
+      </div>
+    </section>
+
+    <!-- タブ2: ツケ残高・清算 -->
+    <section id="tab-debts" class="tab-content" style="display:none;">
+      <div class="card summary-card">
+        <div class="summary-label">現在の立替額合計（未回収のツケ）</div>
+        <div class="summary-amount" id="total-debt-amount">¥0</div>
+        <div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">
+          全員から回収するとこの金額が戻ってきます
+        </div>
+      </div>
+
+      <!-- 幹事専用プール金（実費との差額）カード -->
+      <div class="card" id="profit-summary-card" style="display:none; background:linear-gradient(135deg, #1e293b, #0f172a); border:1px solid #38bdf855; margin-bottom:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <div style="font-size:0.85rem; font-weight:700; color:#38bdf8; display:flex; align-items:center; gap:6px;">
+              <span>🍻 幹事プール金（余剰金）</span>
+              <span style="font-size:0.7rem; background:#0369a1; color:white; padding:1px 6px; border-radius:4px;">幹事専用・PDF非表示</span>
+            </div>
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">
+              計算式: (回収済み金額) - (店舗支払額)
+            </div>
+          </div>
+        </div>
+        <div class="summary-stats" style="margin-top:10px; padding-top:10px;">
+          <div class="stat-item">
+            <div class="stat-val" id="profit-actual-total">¥0</div>
+            <div class="stat-lbl">実費合計</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-val" style="color:var(--green);" id="profit-paid-total">¥0</div>
+            <div class="stat-lbl">回収済合計</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-val" style="color:#38bdf8;" id="profit-diff-amount">¥0</div>
+            <div class="stat-lbl">余剰金</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PDF / 共有ボタン群 -->
+      <div style="display:grid; grid-template-columns: 1fr auto; gap:8px; margin-bottom:16px;">
+        <button class="btn-primary" style="background:#0284c7; padding:12px; font-size:0.95rem; gap:8px;" onclick="openReportPdf()">
+          📄 ツケ内訳のPDF出力・共有
+        </button>
+        <button class="btn-outline" style="padding:12px 14px; font-size:0.85rem;" onclick="openDesignEditor()">
+          🎨 デザイン編集
+        </button>
+      </div>
+
+      <h2 style="font-size:1.1rem; font-weight:700; margin-bottom:12px;">人ごとのツケ一覧</h2>
+      <div id="debt-members-list">読み込み中...</div>
+    </section>
+
+    <!-- タブ3: メンバー管理 -->
+    <section id="tab-members" class="tab-content" style="display:none;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <h2 style="font-size:1.1rem; font-weight:700;">メンバー管理</h2>
+          <span class="header-badge" id="member-total-badge" style="background:#334155;">0人</span>
+        </div>
+        <button class="btn-primary" style="width:auto; padding:6px 12px; font-size:0.85rem;" onclick="openNewMemberModal()">
+          ＋ 新規メンバー
+        </button>
+      </div>
+      <!-- 簡易検索バー -->
+      <div style="margin-bottom:10px;">
+        <input type="text" class="form-input" id="member-search-input" placeholder="🔍 メンバーを絞り込み検索..." style="padding:8px 12px; font-size:0.85rem;" oninput="filterMembers()">
+      </div>
+      <div id="all-members-list">読み込み中...</div>
+    </section>
+  </main>
+
+  <!-- ボトムナビゲーション -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" onclick="switchTab('events')">
+      <span class="nav-icon">🍻</span>
+      <span>集金・飲み会</span>
+    </button>
+    <button class="nav-item" onclick="switchTab('debts')">
+      <span class="nav-icon">💰</span>
+      <span>ツケ・清算</span>
+    </button>
+    <button class="nav-item" onclick="switchTab('members')">
+      <span class="nav-icon">👥</span>
+      <span>メンバー</span>
+    </button>
+  </nav>
+
+  <!-- モーダル: グループ（セッション）選択・作成・編集 -->
+  <div class="modal-backdrop" id="modal-groups">
+    <div class="modal-content">
+      <div class="modal-title">
+        <span>グループ（セッション）の管理</span>
+        <button class="close-btn" onclick="closeModal('modal-groups')">&times;</button>
+      </div>
+      <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:14px;">
+        タップで切り替え、✏️で名前変更、🗑️で削除できます
+      </div>
+      <div id="groups-list" style="margin-bottom:16px;"></div>
+      <div style="border-top:1px solid var(--border); padding-top:14px;">
+        <div style="font-size:0.9rem; font-weight:700; margin-bottom:8px;">＋ 新しいグループを作成</div>
+        <div style="display:flex; gap:8px;">
+          <input type="text" class="form-input" id="new-group-name-input" placeholder="例: 会社同期、フットサル仲間">
+          <button class="btn-primary" style="width:auto; white-space:nowrap;" onclick="submitNewGroup()">作成</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- モーダル: 新規飲み会作成 -->
+  <div class="modal-backdrop" id="modal-new-event">
+    <div class="modal-content">
+      <div class="modal-title">
+        <span>新規飲み会作成</span>
+        <button class="close-btn" onclick="closeModal('modal-new-event')">&times;</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">飲み会名（店名・名目）</label>
+        <input type="text" class="form-input" id="event-title-input" placeholder="例: 渋谷 鳥貴族、2次会 カラオケ">
+      </div>
+      <div class="form-group">
+        <label class="form-label">開催日</label>
+        <input type="date" class="form-input" id="event-date-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">基本会費（1人あたり・後から個別変更可）</label>
+        <input type="number" class="form-input" id="event-fee-input" value="5000" step="500">
+        <div class="quick-amount-buttons">
+          <button class="quick-btn" type="button" onclick="setFee(3000)">¥3,000</button>
+          <button class="quick-btn" type="button" onclick="setFee(4000)">¥4,000</button>
+          <button class="quick-btn" type="button" onclick="setFee(5000)">¥5,000</button>
+          <button class="quick-btn" type="button" onclick="setFee(6000)">¥6,000</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">店舗への実際の支払額（実費・後から入力可）</label>
+        <input type="number" class="form-input" id="event-cost-input" placeholder="例: 18500 (未定の場合は空欄)" step="100">
+      </div>
+      <div class="form-group">
+        <label class="form-label">参加者をまとめて選択（後から追加も可）</label>
+        <div id="new-event-member-checkboxes" style="max-height:120px; overflow-y:auto; border:1px solid var(--border); border-radius:8px; padding:8px;"></div>
+      </div>
+      <button class="btn-primary" onclick="submitNewEvent()">飲み会を作成する</button>
+    </div>
+  </div>
+
+  <!-- モーダル: 飲み会情報編集（飲み会名・日付・基本会費の変更） -->
+  <div class="modal-backdrop" id="modal-edit-event">
+    <div class="modal-content">
+      <div class="modal-title">
+        <span>飲み会情報の編集</span>
+        <button class="close-btn" onclick="closeModal('modal-edit-event')">&times;</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">飲み会名（店名・名目）</label>
+        <input type="text" class="form-input" id="edit-event-title-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">開催日</label>
+        <input type="date" class="form-input" id="edit-event-date-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">基本会費 (円)</label>
+        <input type="number" class="form-input" id="edit-event-fee-input" step="500">
+      </div>
+      <div class="form-group">
+        <label class="form-label">店舗への実際の支払額（実費・円）</label>
+        <input type="number" class="form-input" id="edit-event-cost-input" placeholder="例: 18500" step="100">
+      </div>
+      <button class="btn-primary" onclick="submitEditEvent()">保存する</button>
+    </div>
+  </div>
+
+  <!-- モーダル: 参加者追加 -->
+  <div class="modal-backdrop" id="modal-add-participant">
+    <div class="modal-content">
+      <div class="modal-title">
+        <span>参加者を追加</span>
+        <button class="close-btn" onclick="closeModal('modal-add-participant')">&times;</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">登録済みメンバーから選択</label>
+        <select class="form-input" id="select-existing-member">
+          <option value="">-- 選択してください --</option>
+        </select>
+      </div>
+      <div style="text-align:center; color:var(--text-muted); font-size:0.8rem; margin:8px 0;">または</div>
+      <div class="form-group">
+        <label class="form-label">その場で新メンバーを追加</label>
+        <input type="text" class="form-input" id="new-member-name-input" placeholder="名前・あだ名">
+      </div>
+      <div class="form-group">
+        <label class="form-label">この人の会費（変更ある場合）</label>
+        <input type="number" class="form-input" id="participant-fee-input" value="5000" step="500">
+      </div>
+      <button class="btn-primary" onclick="submitAddParticipant()">参加者を追加する</button>
+    </div>
+  </div>
+
+  <!-- モーダル: 参加者の変更（メンバー差し替え & 会費変更） -->
+  <div class="modal-backdrop" id="modal-edit-participant">
+    <div class="modal-content">
+      <div class="modal-title">
+        <span>参加者の変更</span>
+        <button class="close-btn" onclick="closeModal('modal-edit-participant')">&times;</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">参加メンバー（別の人に差し替える場合選択）</label>
+        <select class="form-input" id="edit-participant-member-select"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">会費額 (円)</label>
+        <input type="number" class="form-input" id="edit-participant-fee-input" step="500">
+      </div>
+      <button class="btn-primary" onclick="submitEditParticipant()">変更を保存</button>
+    </div>
+  </div>
+
+  <!-- モーダル: 一部ツケ入力 -->
+  <div class="modal-backdrop" id="modal-partial-pay">
+    <div class="modal-content">
+      <div class="modal-title">
+        <span id="partial-modal-title">一部ツケの記録</span>
+        <button class="close-btn" onclick="closeModal('modal-partial-pay')">&times;</button>
+      </div>
+      <div style="font-size:0.9rem; color:var(--text-muted); margin-bottom:12px;">
+        会費: <strong id="partial-target-display" style="color:var(--text-main);">¥0</strong>
+      </div>
+      <div class="form-group">
+        <label class="form-label">今、その場で支払った金額</label>
+        <input type="number" class="form-input" id="partial-paid-input" placeholder="例: 3000" step="500" style="font-size:1.4rem; font-weight:bold;">
+        <div class="quick-amount-buttons" id="partial-quick-btns"></div>
+      </div>
+      <div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:10px; margin-bottom:16px;">
+        <div style="display:flex; justify-content:space-between; font-size:0.9rem;">
+          <span>残りのツケ額:</span>
+          <strong id="partial-debt-calc" style="color:var(--red); font-size:1.1rem;">¥0</strong>
+        </div>
+      </div>
+      <button class="btn-primary" onclick="submitPartialPay()">決定して記録</button>
+    </div>
+  </div>
+
+  <!-- モーダル: 返済・清算 -->
+  <div class="modal-backdrop" id="modal-settle">
+    <div class="modal-content">
+      <div class="modal-title">
+        <span id="settle-modal-title">ツケの清算</span>
+        <button class="close-btn" onclick="closeModal('modal-settle')">&times;</button>
+      </div>
+      <div style="font-size:0.9rem; color:var(--text-muted); margin-bottom:12px;">
+        現在のツケ残高: <strong id="settle-target-display" style="color:var(--red);">¥0</strong>
+      </div>
+      <div class="form-group">
+        <label class="form-label">返済された金額（PayPayなど）</label>
+        <input type="number" class="form-input" id="settle-amount-input" step="500" style="font-size:1.4rem; font-weight:bold;">
+        <div class="quick-amount-buttons">
+          <button class="quick-btn" type="button" onclick="setSettleAll()">全額清算</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">返済日時</label>
+        <input type="datetime-local" class="form-input" id="settle-datetime-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">メモ（任意）</label>
+        <input type="text" class="form-input" id="settle-memo-input" placeholder="例: PayPayで送金受領">
+      </div>
+      <button class="btn-primary" onclick="submitSettlement()">返済を確定する</button>
+    </div>
+  </div>
+
+  <!-- モーダル: 新規メンバー登録 -->
+  <div class="modal-backdrop" id="modal-new-member">
+    <div class="modal-content">
+      <div class="modal-title">
+        <span>メンバー登録</span>
+        <button class="close-btn" onclick="closeModal('modal-new-member')">&times;</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">メンバー名（あだ名）</label>
+        <input type="text" class="form-input" id="single-member-name-input" placeholder="例: 山田、サトシ">
+      </div>
+      <button class="btn-primary" onclick="submitNewMember()">登録する</button>
+    </div>
+  </div>
+
+  <script>
+    let currentGroupId = Number(localStorage.getItem('tuke_active_group_id') || 1);
+    let allGroups = [];
+    let currentTab = 'events';
+    let currentEventId = null;
+    let currentEventData = null;
+    let selectedPaymentForPartial = null;
+    let selectedPaymentForEdit = null;
+    let selectedMemberForSettle = null;
+    let cachedMembers = [];
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      document.getElementById('event-date-input').value = new Date().toISOString().split('T')[0];
+      await loadGroups();
+      refreshCurrentGroupView();
+    });
+
+    function formatYen(num) {
+      return '¥' + Number(num || 0).toLocaleString();
+    }
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[m]);
+    }
+
+    function openModal(id) { document.getElementById(id).classList.add('show'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+    // --- グループ管理関連 ---
+    async function loadGroups() {
+      try {
+        const res = await fetch('/api/groups');
+        allGroups = await res.json();
+        
+        if (!allGroups.some(g => g.id === currentGroupId)) {
+          currentGroupId = allGroups.length > 0 ? allGroups[0].id : 1;
+          localStorage.setItem('tuke_active_group_id', currentGroupId);
+        }
+
+        const currGroup = allGroups.find(g => g.id === currentGroupId) || allGroups[0];
+        if (currGroup) {
+          document.getElementById('current-group-name').textContent = currGroup.name;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function openGroupModal() {
+      const container = document.getElementById('groups-list');
+      container.innerHTML = allGroups.map(g => {
+        const isActive = g.id === currentGroupId;
+        return `
+          <div class="group-item-card ${isActive ? 'active' : ''}">
+            <div style="flex:1; cursor:pointer;" onclick="selectGroup(${g.id})">
+              <div style="font-weight:700; font-size:1rem; display:flex; align-items:center; gap:6px;">
+                ${isActive ? '✓ ' : ''}${escapeHtml(g.name)}
+              </div>
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-top:3px;">
+                メンバー: ${g.member_count}人 · 飲み会: ${g.event_count}回
+                ${g.total_debt > 0 ? `<span style="color:var(--red); font-weight:bold; margin-left:6px;">ツケ: ${formatYen(g.total_debt)}</span>` : ''}
+              </div>
+            </div>
+            <div class="group-actions">
+              <button class="btn-outline" style="padding:4px 8px;" onclick="promptEditGroupName(${g.id}, '${escapeHtml(g.name)}')">✏️ 編集</button>
+              ${allGroups.length > 1 ? `
+                <button class="btn-danger-outline" style="padding:4px 8px;" onclick="promptDeleteGroup(${g.id}, '${escapeHtml(g.name)}')">🗑️</button>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+      openModal('modal-groups');
+    }
+
+    async function selectGroup(groupId) {
+      currentGroupId = groupId;
+      localStorage.setItem('tuke_active_group_id', groupId);
+      closeModal('modal-groups');
+      currentEventId = null;
+      document.getElementById('event-detail-view').style.display = 'none';
+      document.getElementById('events-view').style.display = 'block';
+      await loadGroups();
+      refreshCurrentGroupView();
+    }
+
+    async function submitNewGroup() {
+      const input = document.getElementById('new-group-name-input');
+      const name = input.value.trim();
+      if (!name) {
+        alert("グループ名を入力してください");
+        return;
+      }
+      try {
+        const res = await fetch('/api/groups', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ name })
+        });
+        const newGroup = await res.json();
+        input.value = '';
+        await loadGroups();
+        await selectGroup(newGroup.id);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function promptEditGroupName(groupId, currentName) {
+      const newName = prompt("新しいグループ名を入力してください:", currentName);
+      if (!newName || newName.trim() === '' || newName.trim() === currentName) return;
+      try {
+        const res = await fetch(`/api/groups/${groupId}`, {
+          method: 'PUT',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ name: newName.trim() })
+        });
+        if (res.ok) {
+          await loadGroups();
+          openGroupModal();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function promptDeleteGroup(groupId, groupName) {
+      if (!confirm(`グループ「${groupName}」を削除しますか？\n※このグループに登録された飲み会履歴やツケ記録もすべて削除されます。`)) {
+        return;
+      }
+      try {
+        const res = await fetch(`/api/groups/${groupId}`, { method: 'DELETE' });
+        if (res.ok) {
+          await loadGroups();
+          if (currentGroupId === groupId) {
+            currentGroupId = allGroups[0].id;
+            localStorage.setItem('tuke_active_group_id', currentGroupId);
+          }
+          openGroupModal();
+          refreshCurrentGroupView();
+        } else {
+          const err = await res.json();
+          alert(err.error || "削除に失敗しました");
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function refreshCurrentGroupView() {
+      if (currentTab === 'events') {
+        if (currentEventId) reloadEventDetail();
+        else loadEvents();
+      } else if (currentTab === 'debts') {
+        loadDebtsSummary();
+      } else if (currentTab === 'members') {
+        loadMembers();
+      }
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+
+      if (tab === 'events') {
+        document.getElementById('tab-events').style.display = 'block';
+        document.querySelectorAll('.nav-item')[0].classList.add('active');
+        if (!currentEventId) loadEvents();
+      } else if (tab === 'debts') {
+        document.getElementById('tab-debts').style.display = 'block';
+        document.querySelectorAll('.nav-item')[1].classList.add('active');
+        loadDebtsSummary();
+      } else if (tab === 'members') {
+        document.getElementById('tab-members').style.display = 'block';
+        document.querySelectorAll('.nav-item')[2].classList.add('active');
+        loadMembers();
+      }
+    }
+
+    // --- 飲み会（イベント）関連 ---
+    async function loadEvents() {
+      try {
+        const res = await fetch(`/api/events?group_id=${currentGroupId}`);
+        const events = await res.json();
+        const container = document.getElementById('events-list');
+
+        if (events.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-icon">🍻</div>
+              <p>このグループの飲み会はまだありません</p>
+              <button class="btn-primary" style="margin-top:16px; width:auto;" onclick="openNewEventModal()">
+                最初の飲み会を作成
+              </button>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = events.map(e => `
+          <div class="card" style="cursor:pointer;" onclick="openEventDetail(${e.id})">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+              <div>
+                <h3 style="font-size:1.15rem; font-weight:700;">${escapeHtml(e.title)}</h3>
+                <div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">
+                  📅 ${e.event_date} · 参加者: ${e.participant_count}人
+                  ${e.actual_cost !== null && e.actual_cost !== undefined ? ` · <span style="color:#38bdf8;">実費: ${formatYen(e.actual_cost)} (余剰: ${e.surplus > 0 ? '+' : ''}${formatYen(e.surplus)})</span>` : ''}
+                </div>
+              </div>
+              <span class="badge ${e.total_debt > 0 ? 'badge-unpaid' : 'badge-paid'}">
+                ${e.total_debt > 0 ? `ツケ ${formatYen(e.total_debt)}` : '完済'}
+              </span>
+            </div>
+            <div class="summary-stats" style="margin-top:10px; padding-top:8px;">
+              <div class="stat-item">
+                <div class="stat-val">${formatYen(e.total_target)}</div>
+                <div class="stat-lbl">集金予定</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-val" style="color:var(--green);">${formatYen(e.total_paid)}</div>
+                <div class="stat-lbl">回収済</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-val" style="color:var(--red);">${formatYen(e.total_debt)}</div>
+                <div class="stat-lbl">ツケ額</div>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function openEventDetail(eventId) {
+      currentEventId = eventId;
+      document.getElementById('events-view').style.display = 'none';
+      document.getElementById('event-detail-view').style.display = 'block';
+      await reloadEventDetail();
+    }
+
+    function backToEventsList() {
+      currentEventId = null;
+      document.getElementById('event-detail-view').style.display = 'none';
+      document.getElementById('events-view').style.display = 'block';
+      loadEvents();
+    }
+
+    async function reloadEventDetail() {
+      if (!currentEventId) return;
+      try {
+        const res = await fetch(`/api/events/${currentEventId}`);
+        const data = await res.json();
+        currentEventData = data;
+
+        document.getElementById('detail-title').textContent = data.event.title;
+        document.getElementById('detail-date').textContent = `📅 ${data.event.event_date} · 基本会費: ${formatYen(data.event.default_fee)}`;
+        document.getElementById('stat-total-target').textContent = formatYen(data.stats.total_target);
+        document.getElementById('stat-total-paid').textContent = formatYen(data.stats.total_paid);
+        document.getElementById('stat-total-debt').textContent = formatYen(data.stats.total_debt);
+        document.getElementById('participant-count').textContent = data.stats.count;
+
+        // 店舗支払額（実費）と余剰金の表示: (店舗支払額) - (回収済み金額)
+        const actualCostEl = document.getElementById('stat-actual-cost');
+        const profitContainer = document.getElementById('stat-profit-container');
+        const profitAmountEl = document.getElementById('stat-profit-amount');
+
+        if (data.stats.actual_cost !== null && data.stats.actual_cost !== undefined) {
+          actualCostEl.textContent = formatYen(data.stats.actual_cost);
+          profitContainer.style.display = 'block';
+          const surplus = data.stats.surplus;
+          const sign = surplus > 0 ? '+' : '';
+          profitAmountEl.textContent = `${sign}${formatYen(surplus)}`;
+          profitAmountEl.style.color = surplus >= 0 ? '#38bdf8' : 'var(--red)';
+        } else {
+          actualCostEl.textContent = '未入力';
+          profitContainer.style.display = 'none';
+        }
+
+        const list = document.getElementById('participants-list');
+        if (data.participants.length === 0) {
+          list.innerHTML = `
+            <div class="empty-state">
+              <p>参加者がまだ登録されていません</p>
+              <button class="btn-primary" style="margin-top:12px; width:auto;" onclick="openAddParticipantModal()">
+                ＋ 参加者を追加する
+              </button>
+            </div>
+          `;
+          return;
+        }
+
+        list.innerHTML = data.participants.map(p => {
+          const statusClass = p.status.toLowerCase();
+          const badgeText = p.status === 'PAID' ? '全額済' : (p.status === 'PARTIAL' ? '一部ツケ' : '全額ツケ');
+          
+          return `
+            <div class="participant-card ${statusClass}">
+              <div class="p-header">
+                <div>
+                  <span class="p-name">${escapeHtml(p.member_name)}</span>
+                </div>
+                <div class="p-fee-info">
+                  <span>会費: <strong>${formatYen(p.target_amount)}</strong></span>
+                  <button class="btn-outline" style="padding:2px 6px; font-size:0.72rem;" onclick="openEditParticipantModal(${p.id})">変更</button>
+                  <button class="btn-danger-outline" style="padding:2px 6px; font-size:0.72rem;" onclick="removeParticipantFromEvent(${p.id}, '${escapeHtml(p.member_name)}')">外す</button>
+                  <span class="badge badge-${statusClass}">${badgeText}</span>
+                </div>
+              </div>
+
+              <!-- ワンタップ集金ボタン群 -->
+              <div class="action-group">
+                <button class="act-btn act-btn-paid ${p.status === 'PAID' ? 'active' : ''}" onclick="recordPaymentAction(${p.id}, 'paid')">
+                  ✓ 全額済
+                </button>
+                <button class="act-btn act-btn-unpaid ${p.status === 'UNPAID' ? 'active' : ''}" onclick="recordPaymentAction(${p.id}, 'unpaid')">
+                  ✕ ツケ
+                </button>
+                <button class="act-btn act-btn-partial ${p.status === 'PARTIAL' ? 'active' : ''}" onclick="openPartialModal(${p.id})">
+                  △ 一部
+                </button>
+              </div>
+
+              <div class="p-debt-bar">
+                <span>支払済: <strong style="color:var(--green);">${formatYen(p.paid_amount)}</strong></span>
+                <span>ツケ残高: <strong style="color:${p.debt_amount > 0 ? 'var(--red)' : 'var(--text-muted)'};">${formatYen(p.debt_amount)}</strong></span>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // 飲み会名の編集モーダル
+    function openEditEventModal() {
+      if (!currentEventData) return;
+      document.getElementById('edit-event-title-input').value = currentEventData.event.title;
+      document.getElementById('edit-event-date-input').value = currentEventData.event.event_date;
+      document.getElementById('edit-event-fee-input').value = currentEventData.event.default_fee;
+      document.getElementById('edit-event-cost-input').value = currentEventData.event.actual_cost !== null ? currentEventData.event.actual_cost : '';
+      openModal('modal-edit-event');
+    }
+
+    async function submitEditEvent() {
+      const title = document.getElementById('edit-event-title-input').value.trim();
+      const event_date = document.getElementById('edit-event-date-input').value;
+      const default_fee = Number(document.getElementById('edit-event-fee-input').value || 5000);
+      const costVal = document.getElementById('edit-event-cost-input').value.trim();
+      const actual_cost = costVal !== '' ? Number(costVal) : null;
+
+      if (!title) {
+        alert("飲み会名を入力してください");
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/events/${currentEventId}`, {
+          method: 'PUT',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ title, event_date, default_fee, actual_cost })
+        });
+        if (res.ok) {
+          closeModal('modal-edit-event');
+          reloadEventDetail();
+          loadEvents();
+          loadGroups();
+          loadDebtsSummary();
+        } else {
+          const err = await res.json();
+          alert(err.error || "変更に失敗しました");
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // 実費をワンタップで入力・変更
+    async function promptSetActualCost() {
+      if (!currentEventData) return;
+      const curr = currentEventData.event.actual_cost !== null ? currentEventData.event.actual_cost : '';
+      const input = prompt("店舗への実際の支払額（実費）を入力してください (円):", curr);
+      if (input === null) return;
+
+      const trimmed = input.trim();
+      const actual_cost = trimmed !== '' ? Number(trimmed) : null;
+      if (trimmed !== '' && isNaN(actual_cost)) {
+        alert("有効な数値を入力してください");
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/events/${currentEventId}`, {
+          method: 'PUT',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ actual_cost })
+        });
+        if (res.ok) {
+          reloadEventDetail();
+          loadDebtsSummary();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // 参加者の変更モーダル（差し替え & 会費変更）
+    async function openEditParticipantModal(paymentId) {
+      const p = currentEventData.participants.find(item => item.id === paymentId);
+      if (!p) return;
+      selectedPaymentForEdit = p;
+
+      await loadMembersList();
+      const select = document.getElementById('edit-participant-member-select');
+      select.innerHTML = cachedMembers.map(m => `
+        <option value="${m.id}" ${m.id === p.member_id ? 'selected' : ''}>${escapeHtml(m.name)}</option>
+      `).join('');
+
+      document.getElementById('edit-participant-fee-input').value = p.target_amount;
+      openModal('modal-edit-participant');
+    }
+
+    async function submitEditParticipant() {
+      if (!selectedPaymentForEdit) return;
+      const member_id = Number(document.getElementById('edit-participant-member-select').value);
+      const target_amount = Number(document.getElementById('edit-participant-fee-input').value || selectedPaymentForEdit.target_amount);
+
+      try {
+        const res = await fetch(`/api/payments/${selectedPaymentForEdit.id}`, {
+          method: 'PUT',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ action: 'update_fee', member_id, target_amount })
+        });
+        if (res.ok) {
+          closeModal('modal-edit-participant');
+          reloadEventDetail();
+          loadDebtsSummary();
+          loadGroups();
+        } else {
+          const err = await res.json();
+          alert(err.error || "変更に失敗しました");
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // 参加者を飲み会から外す（削除）
+    async function removeParticipantFromEvent(paymentId, memberName) {
+      if (!confirm(`「${memberName}」をこの飲み会の参加者から外しますか？\n※この飲み会での支払・ツケ記録が削除されます。`)) {
+        return;
+      }
+      try {
+        const res = await fetch(`/api/payments/${paymentId}`, { method: 'DELETE' });
+        if (res.ok) {
+          reloadEventDetail();
+          loadDebtsSummary();
+          loadGroups();
+        } else {
+          alert("削除に失敗しました");
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function recordPaymentAction(paymentId, action) {
+      try {
+        const res = await fetch(`/api/payments/${paymentId}`, {
+          method: 'PUT',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ action: action })
+        });
+        if (res.ok) {
+          reloadEventDetail();
+          loadDebtsSummary();
+          loadGroups();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function openPartialModal(paymentId) {
+      const p = currentEventData.participants.find(item => item.id === paymentId);
+      if (!p) return;
+      selectedPaymentForPartial = p;
+
+      document.getElementById('partial-modal-title').textContent = `${p.member_name} の支払額入力`;
+      document.getElementById('partial-target-display').textContent = formatYen(p.target_amount);
+      const paidInput = document.getElementById('partial-paid-input');
+      paidInput.value = p.paid_amount > 0 ? p.paid_amount : '';
+      updatePartialDebtCalc();
+
+      const quickContainer = document.getElementById('partial-quick-btns');
+      const step = 1000;
+      let btnsHtml = '';
+      for (let amt = 1000; amt < p.target_amount; amt += step) {
+        btnsHtml += `<button class="quick-btn" type="button" onclick="setPartialPaid(${amt})">${formatYen(amt)}</button>`;
+      }
+      quickContainer.innerHTML = btnsHtml;
+
+      paidInput.oninput = updatePartialDebtCalc;
+      openModal('modal-partial-pay');
+    }
+
+    function setPartialPaid(amount) {
+      document.getElementById('partial-paid-input').value = amount;
+      updatePartialDebtCalc();
+    }
+
+    function updatePartialDebtCalc() {
+      if (!selectedPaymentForPartial) return;
+      const paid = Number(document.getElementById('partial-paid-input').value || 0);
+      const debt = Math.max(0, selectedPaymentForPartial.target_amount - paid);
+      document.getElementById('partial-debt-calc').textContent = formatYen(debt);
+    }
+
+    async function submitPartialPay() {
+      if (!selectedPaymentForPartial) return;
+      const paid = Number(document.getElementById('partial-paid-input').value || 0);
+      try {
+        await fetch(`/api/payments/${selectedPaymentForPartial.id}`, {
+          method: 'PUT',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ action: 'partial', paid_amount: paid })
+        });
+        closeModal('modal-partial-pay');
+        reloadEventDetail();
+        loadDebtsSummary();
+        loadGroups();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function openNewEventModal() {
+      await loadMembersList();
+      const container = document.getElementById('new-event-member-checkboxes');
+      if (cachedMembers.length === 0) {
+        container.innerHTML = `<span style="font-size:0.8rem; color:var(--text-muted);">メンバー未登録です（作成後に名前で追加可能）</span>`;
+      } else {
+        container.innerHTML = cachedMembers.map(m => `
+          <label style="display:inline-flex; align-items:center; gap:6px; margin:4px 8px 4px 0; font-size:0.85rem; background:#334155; padding:4px 10px; border-radius:6px; cursor:pointer;">
+            <input type="checkbox" name="event_members" value="${m.id}" checked>
+            <span>${escapeHtml(m.name)}</span>
+          </label>
+        `).join('');
+      }
+      openModal('modal-new-event');
+    }
+
+    function setFee(amount) {
+      document.getElementById('event-fee-input').value = amount;
+    }
+
+    async function submitNewEvent() {
+      const title = document.getElementById('event-title-input').value.trim();
+      const event_date = document.getElementById('event-date-input').value;
+      const default_fee = Number(document.getElementById('event-fee-input').value || 5000);
+      const costVal = document.getElementById('event-cost-input').value.trim();
+      const actual_cost = costVal !== '' ? Number(costVal) : null;
+
+      const checkboxes = document.querySelectorAll('input[name="event_members"]:checked');
+      const member_ids = Array.from(checkboxes).map(cb => Number(cb.value));
+
+      if (!title) {
+        alert("飲み会名を入力してください");
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/events', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ title, event_date, default_fee, actual_cost, member_ids, group_id: currentGroupId })
+        });
+        const data = await res.json();
+        closeModal('modal-new-event');
+        document.getElementById('event-title-input').value = '';
+        openEventDetail(data.id);
+        loadGroups();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function openAddParticipantModal() {
+      await loadMembersList();
+      const select = document.getElementById('select-existing-member');
+      select.innerHTML = '<option value="">-- 登録済みから選ぶ --</option>' + 
+        cachedMembers.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+      
+      if (currentEventData) {
+        document.getElementById('participant-fee-input').value = currentEventData.event.default_fee;
+      }
+      document.getElementById('new-member-name-input').value = '';
+      openModal('modal-add-participant');
+    }
+
+    async function submitAddParticipant() {
+      const member_id = document.getElementById('select-existing-member').value;
+      const new_member_name = document.getElementById('new-member-name-input').value.trim();
+      const target_amount = Number(document.getElementById('participant-fee-input').value || 5000);
+
+      if (!member_id && !new_member_name) {
+        alert("メンバーを選択するか、新しい名前を入力してください");
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/events/${currentEventId}/participants`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ member_id: member_id ? Number(member_id) : null, new_member_name, target_amount })
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          alert(err.error || "追加に失敗しました");
+          return;
+        }
+        closeModal('modal-add-participant');
+        reloadEventDetail();
+        loadGroups();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function deleteCurrentEvent() {
+      if (!confirm("この飲み会レコードを削除しますか？")) return;
+      try {
+        await fetch(`/api/events/${currentEventId}`, { method: 'DELETE' });
+        backToEventsList();
+        loadGroups();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // --- ツケ集計・清算・PDF関連 ---
+    function openReportPdf() {
+      window.location.href = `/report.html?group_id=${currentGroupId}`;
+    }
+
+    function openDesignEditor() {
+      window.location.href = `/editor.html?group_id=${currentGroupId}`;
+    }
+
+    async function loadDebtsSummary() {
+      try {
+        const res = await fetch(`/api/summary?group_id=${currentGroupId}`);
+        const data = await res.json();
+        document.getElementById('total-debt-amount').textContent = formatYen(data.total_debt);
+
+        // 幹事プール金（実費差額）カードの表示: (店舗支払額) - (回収済み金額)
+        const profitCard = document.getElementById('profit-summary-card');
+        if (data.profit_summary && data.profit_summary.has_actual_cost) {
+          profitCard.style.display = 'block';
+          document.getElementById('profit-actual-total').textContent = formatYen(data.profit_summary.total_actual_cost);
+          document.getElementById('profit-paid-total').textContent = formatYen(data.profit_summary.total_paid_amount);
+
+          const surplus = data.profit_summary.surplus;
+          const sign = surplus > 0 ? '+' : '';
+          const diffEl = document.getElementById('profit-diff-amount');
+          diffEl.textContent = `${sign}${formatYen(surplus)}`;
+          diffEl.style.color = surplus >= 0 ? '#38bdf8' : 'var(--red)';
+        } else {
+          profitCard.style.display = 'none';
+        }
+
+        const list = document.getElementById('debt-members-list');
+        if (data.debts_by_member.length === 0) {
+          list.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-icon">🎉</div>
+              <p>このグループには、未回収のツケはありません！</p>
+            </div>
+          `;
+          return;
+        }
+
+        list.innerHTML = data.debts_by_member.map(m => `
+          <div class="card" style="margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <h3 style="font-size:1.1rem; font-weight:700;">${escapeHtml(m.name)}</h3>
+                <div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">
+                  ツケ件数: ${m.event_count}件
+                </div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:1.2rem; font-weight:800; color:var(--red);">
+                  ${formatYen(m.debt_total)}
+                </div>
+                <button class="btn-primary" style="width:auto; padding:5px 12px; font-size:0.8rem; margin-top:4px;" onclick="openSettleModal(${m.id}, '${escapeHtml(m.name)}', ${m.debt_total})">
+                  返済・清算
+                </button>
+              </div>
+            </div>
+            <div id="member-debt-details-${m.id}" style="margin-top:10px; padding-top:8px; border-top:1px solid var(--border); font-size:0.8rem;">
+              <button class="btn-outline" style="width:100%;" onclick="toggleMemberDebts(${m.id})">内訳を見る ▼</button>
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function toggleMemberDebts(memberId) {
+      const container = document.getElementById(`member-debt-details-${memberId}`);
+      if (container.dataset.loaded === 'true') {
+        container.innerHTML = `<button class="btn-outline" style="width:100%;" onclick="toggleMemberDebts(${memberId})">内訳を見る ▼</button>`;
+        container.dataset.loaded = 'false';
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/members/${memberId}/debts`);
+        const data = await res.json();
+        container.dataset.loaded = 'true';
+
+        let html = '';
+        if (data.debts && data.debts.length > 0) {
+          html += `<div style="margin-bottom:6px; font-weight:bold; color:var(--text-muted);">未回収ツケの内訳:</div>`;
+          html += data.debts.map(d => `
+            <div class="debt-item">
+              <div>
+                <div><strong>${escapeHtml(d.event_title)}</strong></div>
+                <div style="font-size:0.75rem; color:var(--text-muted);">${d.event_date}</div>
+              </div>
+              <div style="font-weight:bold; color:var(--red);">${formatYen(d.debt_amount)}</div>
+            </div>
+          `).join('');
+        }
+
+        if (data.settlements && data.settlements.length > 0) {
+          html += `<div style="margin:10px 0 6px 0; font-weight:bold; color:var(--green); font-size:0.8rem;">過去の返済履歴:</div>`;
+          html += data.settlements.map(s => `
+            <div class="debt-item" style="padding:6px 12px; background:rgba(34,197,94,0.06); border-radius:6px; margin-bottom:4px;">
+              <div>
+                <div style="font-size:0.8rem; color:var(--text-main);">✓ 返済 ${formatYen(s.amount)} ${s.memo ? `(${escapeHtml(s.memo)})` : ''}</div>
+                <div style="font-size:0.7rem; color:var(--text-muted);">日時: ${s.settled_at}</div>
+              </div>
+            </div>
+          `).join('');
+        }
+
+        html += `<button class="btn-outline" style="width:100%; margin-top:8px;" onclick="toggleMemberDebts(${memberId})">内訳を閉じる ▲</button>`;
+        container.innerHTML = html;
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function openSettleModal(memberId, memberName, totalDebt) {
+      selectedMemberForSettle = { id: memberId, name: memberName, totalDebt: totalDebt };
+      document.getElementById('settle-modal-title').textContent = `${memberName} の返済・清算`;
+      document.getElementById('settle-target-display').textContent = formatYen(totalDebt);
+      document.getElementById('settle-amount-input').value = totalDebt;
+      document.getElementById('settle-memo-input').value = 'PayPay受領';
+
+      // 現在日時を 'YYYY-MM-DDTHH:MM' 形式でセット
+      const now = new Date();
+      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+      document.getElementById('settle-datetime-input').value = now.toISOString().slice(0, 16);
+
+      openModal('modal-settle');
+    }
+
+    function setSettleAll() {
+      if (selectedMemberForSettle) {
+        document.getElementById('settle-amount-input').value = selectedMemberForSettle.totalDebt;
+      }
+    }
+
+    async function submitSettlement() {
+      if (!selectedMemberForSettle) return;
+      const amount = Number(document.getElementById('settle-amount-input').value || 0);
+      const memo = document.getElementById('settle-memo-input').value.trim();
+      const settled_at = document.getElementById('settle-datetime-input').value;
+
+      if (amount <= 0) {
+        alert("有効な返済金額を入力してください");
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/settlements', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ member_id: selectedMemberForSettle.id, amount, memo, settled_at })
+        });
+        if (res.ok) {
+          closeModal('modal-settle');
+          loadDebtsSummary();
+          loadGroups();
+          if (currentEventId) reloadEventDetail();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // --- メンバー管理関連（高密度コンパクトリスト） ---
+    async function loadMembersList() {
+      const res = await fetch(`/api/members?group_id=${currentGroupId}`);
+      cachedMembers = await res.json();
+      return cachedMembers;
+    }
+
+    async function loadMembers() {
+      const members = await loadMembersList();
+      renderMembersList(members);
+    }
+
+    function renderMembersList(members) {
+      const container = document.getElementById('all-members-list');
+      const badge = document.getElementById('member-total-badge');
+      if (badge) badge.textContent = `${members.length}人`;
+
+      if (members.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">👥</div>
+            <p>このグループにはまだメンバーがいません</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="member-compact-list">
+          ${members.map(m => `
+            <div class="member-compact-row">
+              <div class="m-compact-name">${escapeHtml(m.name)}</div>
+              <div class="m-compact-badge">
+                ${m.current_debt > 0 
+                  ? `<span class="badge badge-unpaid" style="padding:2px 8px; font-size:0.75rem;">ツケ ${formatYen(m.current_debt)}</span>` 
+                  : `<span class="badge badge-paid" style="padding:2px 8px; font-size:0.75rem;">ツケなし</span>`}
+              </div>
+              <div class="m-compact-actions">
+                <button class="icon-btn" title="名前を変更" onclick="promptEditMemberName(${m.id}, '${escapeHtml(m.name)}')">✏️</button>
+                <button class="icon-btn-danger" title="削除" onclick="promptDeleteMember(${m.id}, '${escapeHtml(m.name)}', ${m.current_debt})">🗑️</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function filterMembers() {
+      const q = (document.getElementById('member-search-input').value || '').trim().toLowerCase();
+      if (!q) {
+        renderMembersList(cachedMembers);
+        return;
+      }
+      const filtered = cachedMembers.filter(m => m.name.toLowerCase().includes(q));
+      renderMembersList(filtered);
+    }
+
+    function openNewMemberModal() {
+      document.getElementById('single-member-name-input').value = '';
+      openModal('modal-new-member');
+    }
+
+    async function submitNewMember() {
+      const name = document.getElementById('single-member-name-input').value.trim();
+      if (!name) {
+        alert("名前を入力してください");
+        return;
+      }
+      try {
+        const res = await fetch('/api/members', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ name, group_id: currentGroupId })
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          alert(err.error || "登録に失敗しました");
+          return;
+        }
+        closeModal('modal-new-member');
+        loadMembers();
+        loadGroups();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function promptEditMemberName(memberId, currentName) {
+      const newName = prompt("新しいメンバー名を入力してください:", currentName);
+      if (!newName || newName.trim() === '' || newName.trim() === currentName) return;
+      try {
+        const res = await fetch(`/api/members/${memberId}`, {
+          method: 'PUT',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ name: newName.trim() })
+        });
+        if (res.ok) {
+          loadMembers();
+          if (currentEventId) reloadEventDetail();
+        } else {
+          const err = await res.json();
+          alert(err.error || "変更に失敗しました");
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function promptDeleteMember(memberId, memberName, currentDebt) {
+      let msg = `メンバー「${memberName}」を削除しますか？`;
+      if (currentDebt > 0) {
+        msg = `⚠️ 警告:\n「${memberName}」には未回収のツケが ${formatYen(currentDebt)} あります！\n削除すると、このツケデータも削除されます。\n本当に削除しますか？`;
+      }
+      if (!confirm(msg)) return;
+
+      try {
+        const res = await fetch(`/api/members/${memberId}`, { method: 'DELETE' });
+        if (res.ok) {
+          loadMembers();
+          loadDebtsSummary();
+          loadGroups();
+          if (currentEventId) reloadEventDetail();
+        } else {
+          const err = await res.json();
+          alert(err.error || "削除に失敗しました");
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  </script>
+</body>
+</html>

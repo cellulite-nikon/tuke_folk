@@ -1,0 +1,24 @@
+# データベースファイル（個人情報・ツケ記録のためGit管理から除外）
+*.db
+nomikai_tuke.db
+data/
+
+# Python関連
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+build/
+dist/
+
+# Macシステムファイル
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ログファイル
+*.log
+
+# Docker関連
+.docker/
