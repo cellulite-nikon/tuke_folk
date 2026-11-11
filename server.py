@@ -404,6 +404,46 @@ class RequestHandler(BaseHTTPRequestHandler):
         conn = get_db()
         cursor = conn.cursor()
 
+        # データベース書き出し（エクスポート・バックアップ）
+        if path == "/api/backup/export":
+            conn.close()
+            if not os.path.exists(DB_PATH):
+                self._send_error_json("データベースファイルが存在しません", 404)
+                return
+
+            import tempfile
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"nomikai_tuke_{timestamp}.db"
+
+            with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+                tmp_path = tmp.name
+
+            try:
+                src_conn = sqlite3.connect(DB_PATH)
+                dst_conn = sqlite3.connect(tmp_path)
+                src_conn.backup(dst_conn)
+                dst_conn.close()
+                src_conn.close()
+
+                with open(tmp_path, "rb") as f:
+                    content = f.read()
+
+                os.remove(tmp_path)
+
+                self.send_response(200)
+                self.send_header("Content-Type", "application/x-sqlite3")
+                self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+                self.send_header("Content-Length", str(len(content)))
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(content)
+            except Exception as e:
+                if os.path.exists(tmp_path):
+                    try: os.remove(tmp_path)
+                    except Exception: pass
+                self._send_error_json(f"エクスポート中にエラーが発生しました: {str(e)}", 500)
+            return
+
         # テンプレート取得API
         if path == "/api/template":
             cursor.execute("SELECT * FROM report_templates WHERE name = 'default'")
@@ -718,6 +758,54 @@ class RequestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         parsed = urlparse(self.path)
         path = parsed.path
+
+        # データベースインポート（復元）
+        if path == "/api/backup/import":
+            content_length = int(self.headers.get("Content-Length", 0))
+            if content_length == 0:
+                self._send_error_json("ファイルデータが空です")
+                return
+
+            db_bytes = self.rfile.read(content_length)
+
+            # SQLite3ヘッダー検証 (先頭16バイト: 'SQLite format 3\0')
+            if len(db_bytes) < 16 or not db_bytes.startswith(b"SQLite format 3\x00"):
+                self._send_error_json("無効なSQLiteデータベースファイルです（.dbファイルを選択してください）")
+                return
+
+            import tempfile, shutil
+            with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+                tmp.write(db_bytes)
+                tmp_path = tmp.name
+
+            try:
+                test_conn = sqlite3.connect(tmp_path)
+                test_cur = test_conn.cursor()
+                test_cur.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table'")
+                test_conn.close()
+            except Exception as e:
+                if os.path.exists(tmp_path):
+                    try: os.remove(tmp_path)
+                    except Exception: pass
+                self._send_error_json(f"データベースファイルが破損しています: {str(e)}")
+                return
+
+            # 現行DBの自動バックアップを作成
+            if os.path.exists(DB_PATH):
+                backup_name = DB_PATH + f".bak_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                try:
+                    shutil.copy2(DB_PATH, backup_name)
+                except Exception:
+                    pass
+
+            try:
+                shutil.move(tmp_path, DB_PATH)
+                init_db()
+                self._send_json({"success": True, "message": "データベースを正常にインポートしました"})
+            except Exception as e:
+                self._send_error_json(f"ファイルの置き換え中にエラーが発生しました: {str(e)}", 500)
+            return
+
         body = self._read_json()
         conn = get_db()
         cursor = conn.cursor()

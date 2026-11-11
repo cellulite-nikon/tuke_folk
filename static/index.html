@@ -610,6 +610,24 @@
 
       <h2 style="font-size:1.1rem; font-weight:700; margin-bottom:12px;">人ごとのツケ一覧</h2>
       <div id="debt-members-list">読み込み中...</div>
+
+      <!-- データベース書き出し・インポート（データ管理）カード -->
+      <div class="card" style="margin-top:24px; border:1px solid var(--border); padding:16px;">
+        <div style="font-size:0.95rem; font-weight:700; margin-bottom:4px; display:flex; align-items:center; gap:6px;">
+          <span>💾 データベース管理（バックアップ・移行）</span>
+        </div>
+        <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:12px;">
+          nomikai_tuke.db の書き出しと読み込みができます。次の代への引き継ぎや定期的なバックアップにご利用ください。
+        </div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+          <button class="btn-outline" style="padding:10px; font-size:0.85rem; gap:6px;" onclick="exportDatabase()">
+            📦 DBを書き出し
+          </button>
+          <button class="btn-outline" style="padding:10px; font-size:0.85rem; gap:6px;" onclick="openModal('modal-import-db')">
+            📥 DBをインポート
+          </button>
+        </div>
+      </div>
     </section>
 
     <!-- タブ3: メンバー管理 -->
@@ -843,6 +861,28 @@
         <input type="text" class="form-input" id="single-member-name-input" placeholder="例: 山田、サトシ">
       </div>
       <button class="btn-primary" onclick="submitNewMember()">登録する</button>
+    </div>
+  </div>
+
+  <!-- モーダル: データベースインポート -->
+  <div class="modal-backdrop" id="modal-import-db">
+    <div class="modal-content">
+      <div class="modal-title">
+        <span>データベースのインポート（復元）</span>
+        <button class="close-btn" onclick="closeModal('modal-import-db')">&times;</button>
+      </div>
+      <div style="background:rgba(239,68,68,0.1); border:1px solid #ef444455; padding:12px; border-radius:10px; margin-bottom:14px; font-size:0.8rem; color:#fca5a5;">
+        ⚠️ <strong>ご注意:</strong><br>
+        インポートを実行すると、現在の全データ（メンバー・飲み会・ツケ記録）が選択したファイルの内容で置き換わります。<br>
+        ※万が一のため、現在のデータはサーバー側に自動バックアップされます。
+      </div>
+      <div class="form-group">
+        <label class="form-label">バックアップファイル (.db) を選択</label>
+        <input type="file" id="db-file-input" accept=".db" class="form-input" style="padding:10px;">
+      </div>
+      <button class="btn-primary" id="btn-do-import" style="background:#dc2626;" onclick="submitImportDatabase()">
+        データを復元する
+      </button>
     </div>
   </div>
 
@@ -1487,6 +1527,53 @@
         loadGroups();
       } catch (err) {
         console.error(err);
+      }
+    }
+
+    // --- データベース書き出し・インポート ---
+    function exportDatabase() {
+      // ブラウザダウンロードをトリガー
+      window.location.href = '/api/backup/export';
+    }
+
+    async function submitImportDatabase() {
+      const fileInput = document.getElementById('db-file-input');
+      const file = fileInput.files[0];
+      if (!file) {
+        alert("復元する .db ファイルを選択してください");
+        return;
+      }
+
+      if (!confirm(`選択したファイル「${file.name}」でデータベースを置き換えます。\n本当によろしいですか？`)) {
+        return;
+      }
+
+      const btn = document.getElementById('btn-do-import');
+      btn.disabled = true;
+      btn.textContent = 'インポート中...';
+
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const res = await fetch('/api/backup/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: arrayBuffer
+        });
+
+        if (res.ok) {
+          alert("🎉 データベースを正常にインポートしました！\n画面を再読み込みします。");
+          window.location.reload();
+        } else {
+          const err = await res.json();
+          alert("エラー: " + (err.error || "インポートに失敗しました"));
+          btn.disabled = false;
+          btn.textContent = 'データを復元する';
+        }
+      } catch (err) {
+        console.error(err);
+        alert("インポート中に通信エラーが発生しました");
+        btn.disabled = false;
+        btn.textContent = 'データを復元する';
       }
     }
 
